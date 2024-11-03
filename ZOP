@@ -1,0 +1,85 @@
+# irs_soi_analysis.py
+
+import os
+import pandas as pd
+import matplotlib.pyplot as plt
+
+def load_data(folder_path):
+    """
+    Load IRS SOI tax income data from multiple CSV files.
+    
+    Args:
+        folder_path (str): Path to the folder containing IRS SOI CSV files.
+    
+    Returns:
+        pd.DataFrame: Combined DataFrame with all years' data.
+    """
+    dataframes = []
+    for filename in os.listdir(folder_path):
+        if filename.endswith('.csv'):
+            df = pd.read_csv(os.path.join(folder_path, filename))
+            # Assuming each file has a 'YEAR' column indicating the year of data
+            dataframes.append(df)
+    return pd.concat(dataframes, ignore_index=True)
+
+def preprocess_data(df):
+    """
+    Preprocess the data by filtering relevant columns and handling missing values.
+    
+    Args:
+        df (pd.DataFrame): Combined DataFrame.
+    
+    Returns:
+        pd.DataFrame: Preprocessed DataFrame with necessary columns.
+    """
+    # Filter relevant columns (assuming 'ZIPCODE', 'YEAR', 'AGI' exist)
+    df = df[['ZIPCODE', 'YEAR', 'AGI']]
+    # Remove any missing or invalid ZIP codes
+    df = df.dropna(subset=['ZIPCODE', 'YEAR', 'AGI'])
+    df['ZIPCODE'] = df['ZIPCODE'].astype(str).str.zfill(5)
+    return df
+
+def calculate_income_changes(df):
+    """
+    Calculate the income changes over time by ZIP code.
+    
+    Args:
+        df (pd.DataFrame): Preprocessed DataFrame with ZIP code, year, and AGI.
+    
+    Returns:
+        pd.DataFrame: DataFrame with income changes by ZIP code and year.
+    """
+    df = df.groupby(['ZIPCODE', 'YEAR'])['AGI'].sum().reset_index()
+    df['AGI_change'] = df.groupby('ZIPCODE')['AGI'].pct_change() * 100
+    return df
+
+def plot_income_change(df, zip_code):
+    """
+    Plot the income change over time for a specific ZIP code.
+    
+    Args:
+        df (pd.DataFrame): DataFrame with income changes by ZIP code and year.
+        zip_code (str): ZIP code to plot.
+    """
+    df_zip = df[df['ZIPCODE'] == zip_code]
+    plt.figure(figsize=(10, 6))
+    plt.plot(df_zip['YEAR'], df_zip['AGI_change'], marker='o', color='b')
+    plt.title(f"Income Change Over Time for ZIP Code {zip_code}")
+    plt.xlabel("Year")
+    plt.ylabel("AGI Change (%)")
+    plt.grid()
+    plt.show()
+
+if __name__ == "__main__":
+    # Specify the folder path where CSV files are stored
+    folder_path = "./irs_data"
+    
+    # Load and preprocess data
+    df = load_data(folder_path)
+    df = preprocess_data(df)
+    
+    # Calculate income changes
+    df_changes = calculate_income_changes(df)
+    
+    # Plot income changes for a specific ZIP code (example: '10001')
+    plot_income_change(df_changes, "10001")
